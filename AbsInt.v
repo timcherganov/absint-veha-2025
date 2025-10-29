@@ -120,14 +120,16 @@ Section AbsState.
       Определите операции решетки на абстрактных состояних с помощью операций
       решетки на абстрактных значениях. *)
 
-  Global Instance astateLatticeOp : LatticeOp astate.
+  #[global]
+  Instance astateLatticeOp : LatticeOp astate.
   Admitted.
 
   (** Покажите, что на абстактном состоянии определено отображение
       конкретизации, индуцированное отображением конкретизации на абстрактных
       значениях. *)
 
-  Global Instance astateConcretization : Concretization astate state.
+  #[global]
+  Instance astateConcretization : Concretization astate state.
   Admitted.
 End AbsState.
 
@@ -300,7 +302,7 @@ Compute
 (** Программа:
 <<
     x := 0;
-    while x < 11
+    while x < 10
       do x := x + 1
     end
 >>
@@ -308,7 +310,7 @@ Compute
 
 Definition prog2 : com :=
   "x" ::= Const 0 ;;
-  While (Binop Olt (Var "x") (Const 11))
+  While (Binop Olt (Var "x") (Const 10))
     ("x" ::= Binop Oplus (Var "x") (Const 1)).
 
 Compute
@@ -322,7 +324,7 @@ Compute
   [x] неизвестно
 *)
 
-(** С другой стороны, при выходе из цикла должно выполняться условие x in [11; infty].
+(** С другой стороны, при выходе из цикла должно выполняться условие [x] ∈ [10; +∞].
   Наш анализ не может это обнаружить,
   потому что в опредлении функции aceval мы игнорируем значения логических выражений в if и while. *)
 
