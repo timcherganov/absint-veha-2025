@@ -1,0 +1,51 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[T2A]{fontenc}
+\usepackage[english,russian]{babel}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[colorlinks,urlcolor=NavyBlue]{hyperref}
+\usepackage{indentfirst}
+\usepackage[color]{coqdoc}
+\usepackage[left=3cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+
+\usepackage{enumitem}
+\setlist{nosep}
+
+\renewcommand{\labelitemi}{--}
+
+% \usepackage{amsmath}
+% \usepackage{amssymb}
+
+% \newtheorem{lemma}{Lemma}
+% \newtheorem{theorem}{Theorem}
+
+\makeatletter
+\def\@settitle{\begin{center}%
+    \baselineskip14\p@\relax
+    \Large
+    \@title
+  \end{center}%
+}
+\makeatother
+
+\renewcommand\thesection{\arabic{section}.}
+\renewcommand\thesubsection{\thesection\arabic{subsection}.}
+
+\title{Введение в Coq}
+\author{}
+\date{}
+
+\begin{document}
+%\tableofcontents
+\maketitle
+\input{Intro}
+\end{document}
+
+
+% \documentclass[12pt]{report}
+% \usepackage[utf8]{inputenc}
+% \usepackage[T2A]{fontenc}
+% %\usepackage{fullpage}
+% \usepackage{coqdoc}
+% \usepackage{amsmath,amssymb}
+% \usepackage{url}
