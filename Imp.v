@@ -4,22 +4,39 @@ Local Open Scope Z_scope.
 
 (** * Состояние *)
 
+(** Cостояние -- это функция из строк в целые чила. *)
+
 Definition state : Type := string -> Z.
+
+(** Изменение значений функции. *)
 
 Definition update {Y : Type} (k : string) (y : Y) (f : string -> Y) : string -> Y :=
   fun x => if string_dec k x then y else f x.
 
 (** * Синтаксис *)
 
-Inductive binop : Type := Oplus | Oeq | Olt | Oand.
+(** Унарные и бинарные операции. *)
 
 Inductive unop : Type := Oopp | Oneg.
+
+Inductive binop : Type := Oplus | Oeq | Olt | Oand.
+
+(** Выражения языка могут быть переменными, константами применением унарной
+    операции к выражению или применением бинарной операции к двум выражениям. *)
 
 Inductive exp : Type :=
 | Var (x : string)
 | Const (n : Z)
 | Unop (op : unop) (e : exp)
 | Binop (op : binop) (e1 e2 : exp).
+
+(** Команды языка:
+    - команда [Skip], которая ничего не делает;
+    - команда присваивания, которая записывает результат вычисления выражения
+      в переменную;
+    - оператор последовательного выполнения двух команд;
+    - условный оператор;
+    - оператор цикла. *)
 
 Inductive com : Type :=
 | Skip
