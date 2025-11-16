@@ -1,0 +1,238 @@
+Основное решение это первое присланное, но также прикладываем наработки по 5 заданию, идея была сделать чувствительность к пути чтобы условие запустившее абстрактную интерпретацию If или While повлияло на абстрактное состояние соответствующее нодам покрытым оператором If или While.
+
+Сигнатуры были exp -> astate V -> astate V;
+
+Прикладываем diff наработок по 5 заданию, для плоской решетки не успели портировать поэтому закоментили
+
+diff --git a/AbsIntCond.v b/AbsIntCond.v
+index d369f38..58f4faf 100644
+--- a/AbsIntCond.v
++++ b/AbsIntCond.v
+@@ -416,6 +416,24 @@ End AbsState.
+ Arguments get {_ _}.
+ Arguments set {_}.
+ 
++Class AbsCond (V : Type) `{AbsValue V} := {
++  assume_true  : exp -> astate V -> astate V;
++  assume_false : exp -> astate V -> astate V;
++
++  γ_assume_true :
++    forall (e : exp) (a : astate V) (s : state),
++      γs (V) a s ->
++      eval e s <> 0 ->
++      γs (V) (assume_true e a) s;
++
++  γ_assume_false :
++    forall (e : exp) (a : astate V) (s : state),
++      γs (V) a s ->
++      eval e s = 0 ->
++      γs (V) (assume_false e a) s
++}.
++
++
+ (** * Неподвижная точка *)
+ 
+ Section fixpoint.
+@@ -463,7 +481,7 @@ End fixpoint.
+ (** * Корректность абстрактной интерпретации *)
+ 
+ Section Analysis.
+-  Context V `{AbsValue V}.
++  Context V `{AbsValue V} `{AbsCond V}.
+ 
+   (** Абстрактная семантика выражений. *)
+ 
+@@ -507,9 +525,15 @@ Section Analysis.
+     | Skip       => a
+     | x ::= e    => set x (aeval e a) a
+     | c1 ;; c2   => aceval c2 (aceval c1 a)
+-    | If e c1 c2 => aceval c1 a ∨ aceval c2 a
+-    | While e c  => postfixpoint (fun X => a ∨ aceval c X)
+-    end.
++    | If e c1 c2 =>
++        let a_then  := aceval c1 (assume_true e a) in
++        let a_else  := aceval c2 (assume_false e a) in
++        a_then ∨ a_else
++    | While e c  =>
++        let F (X : astate V) : astate V :=
++          a ∨ aceval c (assume_true e X) in
++        assume_false e (postfixpoint F)
++  end.
+ 
+   (** ** Задание 2
+ 
+@@ -796,6 +820,18 @@ Instance flatZAbsValue : AbsValue flatZ := {
+ >>
+ *)
+ 
++(* Instance flatZAbsCond : AbsCond flatZ := {
++  assume_true  := fun (_ : exp) (a : astate flatZ) => a;
++  assume_false := fun (_ : exp) (a : astate flatZ) => a;
++}.
++Proof.
++  - (* γ_assume_true *)
++    intros e a s Hγ _; exact Hγ.
++  - (* γ_assume_false *)
++    intros e a s Hγ _; exact Hγ.
++Qed. *)
++
++
+ Definition prog1 : com :=
+   "x" ::= Const 1 ;; "y" ::= Const 10 ;;
+   "z" ::= Binop Oplus (Var "x") (Var "y") ;;
+@@ -803,9 +839,9 @@ Definition prog1 : com :=
+     ("y" ::= Binop Oplus (Var "x") (Var "z") ;; "x" ::= Const 0)
+     ("y" ::= Const 12).
+ 
+-Compute
+-  let a := aceval flatZ prog1 ⊤ in
+-  (get "x" a, get "y" a, get "z" a).
++(* Compute *)
++  (* let a := aceval flatZ prog1 ⊤ in *)
++  (* (get "x" a, get "y" a, get "z" a). *)
+ 
+ (** Результат анализа:
+ <<
+@@ -1180,6 +1216,119 @@ Instance IntervalAbsValue : AbsValue LiftedInterval := {
+   γ_abinop := γ_IntervalBinop;
+ }.
+ 
++(* сужаем интервал по условию z < n *)
++Definition narrow_lt_const (iv : LiftedInterval) (n : Z)
++  : LiftedInterval :=
++  match iv with
++  | IntervalBot => IntervalBot
++  | RecInterval i =>
++      let l := low i in
++      let h := high i in
++      RecInterval {|
++        low  := l;
++        high :=
++          match h with
++          | Fin h' => Fin (Z.min h' (n - 1))
++          | Inf    => Fin (n - 1)
++          end
++      |}
++  end.
++
++(* сужаем интервал по условию z >= n *)
++Definition narrow_ge_const (iv : LiftedInterval) (n : Z)
++  : LiftedInterval :=
++  match iv with
++  | IntervalBot => IntervalBot
++  | RecInterval i =>
++      let l := low i in
++      let h := high i in
++      RecInterval {|
++        low  :=
++          match l with
++          | Fin l' => Fin (Z.max l' n)
++          | Inf    => Fin n
++          end;
++        high := h
++      |}
++  end.
++
++Lemma γ_narrow_lt_const :
++  forall iv n z,
++    γ_Interval iv z ->
++    z < n ->
++    γ_Interval (narrow_lt_const iv n) z.
++Proof.
++  intros [i|] n z Hγ Hz; simpl in *.
++  - destruct i as [l h]; simpl in *.
++    destruct l, h; simpl in *; try contradiction; try trivial.
++    destruct Hγ; split; lia.
++    + split; lia.
++    + lia.
++    + lia.
++  - contradiction.
++Qed.
++
++Lemma γ_narrow_ge_const :
++  forall iv n z,
++    γ_Interval iv z ->
++    z >= n ->
++    γ_Interval (narrow_ge_const iv n) z.
++Proof.
++  intros [i|] n z Hγ Hz; simpl in *.
++  - destruct i as [l h]; simpl in *.
++    destruct l, h; simpl in *; try contradiction; try trivial.
++    + (* Fin l, Fin h *)
++      destruct Hγ as [Hlow Hhigh]; split; try lia.
++    + (* Fin l, Inf *)
++      lia.
++    + (* Inf, Fin h *)
++      split; try lia.
++    + (* Inf, Inf *)
++      lia.
++  - contradiction.
++Qed.
++
++Definition assume_true_interval (e : exp) (a : astate LiftedInterval)
++  : astate LiftedInterval :=
++  match e, a with
++  | Binop Olt (Var x) (Const n), Some _ =>
++      let iv  := get x a in
++      let iv' := narrow_lt_const iv n in
++      set x iv' a
++  | _, _ => a
++  end.
++
++Definition assume_false_interval (e : exp) (a : astate LiftedInterval)
++  : astate LiftedInterval :=
++  match e, a with
++  | Binop Olt (Var x) (Const n), Some _ =>
++      let iv  := get x a in
++      let iv' := narrow_ge_const iv n in
++      set x iv' a
++  | _, _ => a
++  end.
++
++Lemma γ_assume_true_interval :
++  forall (e : exp) (a : astate LiftedInterval) (s : state),
++    γs (LiftedInterval) a s ->
++    eval e s <> 0 ->
++    γs (LiftedInterval) (assume_true_interval e a) s.
++Admitted.
++
++Lemma γ_assume_false_interval :
++  forall (e : exp) (a : astate LiftedInterval) (s : state),
++    γs (LiftedInterval) a s ->
++    eval e s = 0 ->
++    γs (LiftedInterval) (assume_false_interval e a) s.
++Admitted.
++
++Instance IntervalAbsCond : AbsCond LiftedInterval := {
++  assume_true  := assume_true_interval;
++  assume_false := assume_false_interval;
++  γ_assume_true  := γ_assume_true_interval;
++  γ_assume_false := γ_assume_false_interval;
++}.
++
+ (** Программа:
+ <<
+     x := 1; y := 10; z := x + y;
+@@ -1221,6 +1370,22 @@ Compute
+   let a := aceval LiftedInterval prog2 ⊤ in
+   get "x" a.
+ 
++Definition prog_if_interval : com :=
++  "x" ::= Const 0 ;;
++  If (Binop Olt (Var "x") (Const 10))
++     ("y" ::= Const 1)
++     ("y" ::= Const 2).
++
++Definition init_interval_state : com :=
++  "x" ::= Const 0;;
++  If (Binop Olt (Var "x") (Const 0))
++     ("x" ::= Binop Oplus (Var "x") (Const 21)) ("x" ::= Binop Oplus (Var "x") (Const 0)).
++
++Compute
++  let a := aceval LiftedInterval prog_if_interval (aceval LiftedInterval init_interval_state ⊤) in
++  (get "x" a, get "y" a).
++
++
+ (** Результат анализа:
+ <<
+   = {| low := Inf; high := Inf |}
